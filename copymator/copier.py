@@ -122,9 +122,9 @@ class FileCopier:
 
 
 def run_copy(settings: AppSettings, progress: ProgressReporter) -> List[CopyPlanItem]:
-    """Wykonuje pełny proces kopiowania na podstawie ustawień.
+    """Executes the full copy process based on the given settings.
 
-    Funkcja ta jest niezależna od CLI i może być użyta w przyszłym GUI.
+    This function is independent of the CLI and can be reused in a future GUI.
     """
     template = PathTemplate(settings.path_template)
     planner = CopyPlanner()

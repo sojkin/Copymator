@@ -12,6 +12,14 @@ def get_log_file_path() -> Path:
     return storage.base_dir / "copymator.log"
 
 
+def clear_log_file() -> None:
+    """Clear the contents of the log file."""
+    log_path = get_log_file_path()
+    if log_path.exists():
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.truncate()
+
+
 def configure_logging() -> None:
     """Configure global logging for Copymator.
 

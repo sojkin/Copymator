@@ -31,3 +31,6 @@ copymator.log
 .codex/
 agent-transcripts/
 
+# AI Agent Instructions
+AGENT_INSTRUCTIONS.md
+

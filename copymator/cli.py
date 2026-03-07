@@ -3,15 +3,28 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 import sys
+import os
 
 from .config import AppSettings, SettingsStorage
 from .copier import run_copy
-from .logging_setup import configure_logging
+from .logging_setup import configure_logging, get_log_file_path, clear_log_file
 from .progress import ConsoleProgressReporter
 
 
 DEFAULT_TEMPLATE_DATE = "{year}/{year}-{month}/{year}-{month}-{day}"
 DEFAULT_TEMPLATE_CAMERA = "{camera}/{year}-{month}-{day}"
+
+TEMPLATE_PARTS = {
+    "1": {"value": "{year}", "desc": "Year photo was taken (YYYY)"},
+    "2": {"value": "{month}", "desc": "Month photo was taken (MM)"},
+    "3": {"value": "{day}", "desc": "Day photo was taken (DD)"},
+    "4": {"value": "{camera}", "desc": "Camera model"},
+}
+
+
+def clear_screen():
+    """Clears the console screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 def ask_yes_no(prompt: str, default: bool = True) -> bool:
@@ -28,7 +41,7 @@ def ask_yes_no(prompt: str, default: bool = True) -> bool:
             return True
         if answer in {"n", "no"}:
             return False
-        print("Proszę odpowiedzieć 'y' lub 'n'.")
+        print("Please answer 'y' or 'n'.")
 
 
 def ask_path(prompt: str, must_exist: bool = False) -> Path:
@@ -37,41 +50,88 @@ def ask_path(prompt: str, must_exist: bool = False) -> Path:
         raw = input(prompt + " ").strip()
         p = Path(raw).expanduser()
         if must_exist and not p.exists():
-            print("Ścieżka nie istnieje, spróbuj ponownie.")
+            print("Path does not exist, please try again.")
             continue
         return p
 
 
-def choose_template() -> str:
-    """Let the user choose one of the predefined directory templates."""
-    print("Wybierz szablon struktury katalogów:")
-    print(f"1) {DEFAULT_TEMPLATE_DATE} (rok/miesiąc/dzień)")
-    print(f"2) {DEFAULT_TEMPLATE_CAMERA} (aparat/rok-miesiąc-dzień)")
+def build_template_interactively() -> str:
+    """Guide the user through building a custom path template."""
+    template_parts = []
     while True:
-        choice = input("Wybór (1/2): ").strip()
+        clear_screen()
+        print("--- Path Template Builder ---\n")
+        print("Available parts:")
+        for key, part in TEMPLATE_PARTS.items():
+            print(f"  {key}) {part['value']} - {part['desc']}")
+        print("Type 's' to add a separator (e.g., / or -).")
+        print("Type 'f' to finish and save the template.")
+        print("Type 'c' to cancel and exit the builder.\n")
+
+        current_template = "".join(template_parts)
+        print(f"Current template: {current_template}\n")
+        choice = input("Choose a part, 's' (separator), 'f' (finish), 'c' (cancel): ").strip().lower()
+
+        if choice in TEMPLATE_PARTS:
+            template_parts.append(TEMPLATE_PARTS[choice]["value"])
+        elif choice == 's':
+            separator = input("Enter separator: ")
+            template_parts.append(separator)
+        elif choice == 'f':
+            if not current_template:
+                print("Template cannot be empty. Press Enter to continue...")
+                input()
+                continue
+            return current_template
+        elif choice == 'c':
+            return ""  # Return empty to indicate cancellation
+        else:
+            print("Invalid option. Press Enter to try again...")
+            input()
+
+
+def choose_template() -> str:
+    """Let the user choose a template or build one."""
+    while True:
+        clear_screen()
+        print("Choose a directory structure template:")
+        print(f"1) {DEFAULT_TEMPLATE_DATE} (date)")
+        print(f"2) {DEFAULT_TEMPLATE_CAMERA} (camera)")
+        print("3) Build a custom template")
+
+        choice = input("Choice (1/2/3): ").strip()
         if choice == "1":
             return DEFAULT_TEMPLATE_DATE
         if choice == "2":
             return DEFAULT_TEMPLATE_CAMERA
-        print("Nieprawidłowa opcja, wybierz 1 lub 2.")
+        if choice == "3":
+            custom_template = build_template_interactively()
+            if custom_template:
+                return custom_template
+            # If builder was cancelled, loop again
+            print("\nTemplate creation cancelled. Please choose an option.")
+            continue
+
+        print("Invalid option, choose 1, 2, or 3.")
 
 
 def first_run_config(storage: SettingsStorage) -> AppSettings:
     """Interactively create the first configuration when no settings file exists."""
-    print("Wygląda na to, że uruchamiasz Copymator po raz pierwszy.")
-    print("Wybierz tryb:")
-    print("1) Szybkie kopiowanie z domyślnymi ustawieniami")
-    print("2) Konfiguracja szczegółowa")
+    clear_screen()
+    print("It looks like you are running Copymator for the first time.")
+    print("Choose a mode:")
+    print("1) Quick copy with default settings")
+    print("2) Detailed configuration")
 
     mode: Optional[str] = None
     while mode not in {"1", "2"}:
-        mode = input("Wybór (1/2): ").strip()
+        mode = input("Choice (1/2): ").strip()
         if mode not in {"1", "2"}:
-            print("Nieprawidłowa opcja, wybierz 1 lub 2.")
+            print("Invalid option, choose 1 or 2.")
 
     if mode == "1":
-        target_dir = ask_path("Podaj katalog docelowy zdjęć:", must_exist=False)
-        source_dir = ask_path("Podaj katalog źródłowy (karta pamięci):", must_exist=True)
+        target_dir = ask_path("Enter the target directory for photos:", must_exist=False)
+        source_dir = ask_path("Enter the source directory (memory card):", must_exist=True)
         path_template = DEFAULT_TEMPLATE_DATE
         settings = AppSettings(
             source_dir=source_dir,
@@ -83,25 +143,25 @@ def first_run_config(storage: SettingsStorage) -> AppSettings:
         storage.save(settings)
         return settings
 
-    print("Konfiguracja szczegółowa:")
-    source_dir = ask_path("Podaj katalog źródłowy (karta pamięci):", must_exist=True)
-    target_dir = ask_path("Podaj katalog docelowy zdjęć:", must_exist=False)
+    print("\nDetailed configuration:")
+    source_dir = ask_path("Enter the source directory (memory card):", must_exist=True)
+    target_dir = ask_path("Enter the target directory for photos:", must_exist=False)
     path_template = choose_template()
 
-    print("Zachowanie przy konflikcie nazw:")
-    print("1) pominąć istniejący plik")
-    print("2) nadpisać istniejący plik")
-    print("3) zapisać pod nową nazwą (dodaj numer)")
+    print("\nFile name conflict behavior:")
+    print("1) skip existing file")
+    print("2) overwrite existing file")
+    print("3) save with a new name (add a number)")
     conflict_choice = None
     while conflict_choice not in {"1", "2", "3"}:
-        conflict_choice = input("Wybór (1/2/3): ").strip()
+        conflict_choice = input("Choice (1/2/3): ").strip()
         if conflict_choice not in {"1", "2", "3"}:
-            print("Nieprawidłowa opcja, wybierz 1, 2 lub 3.")
+            print("Invalid option, choose 1, 2, or 3.")
     conflict_map = {"1": "skip", "2": "overwrite", "3": "rename"}
     conflict_strategy = conflict_map[conflict_choice]
 
     ask_on_start = ask_yes_no(
-        "Czy przy każdym uruchomieniu pytać o potwierdzenie ustawień?", default=True
+        "\nAsk for confirmation on every run?", default=True
     )
 
     settings = AppSettings(
@@ -117,11 +177,12 @@ def first_run_config(storage: SettingsStorage) -> AppSettings:
 
 def maybe_confirm_settings(settings: AppSettings) -> AppSettings:
     """Display current settings and optionally let the user tweak them."""
+    clear_screen()
     print("Current settings:")
     print(f"  Source (card): {settings.source_dir}")
     print(f"  Target: {settings.target_dir}")
     print(f"  Path template: {settings.path_template}")
-    print(f"  File conflict strategy: {settings.conflict_strategy}")
+    print(f"  File conflicts: {settings.conflict_strategy}\n")
 
     if not settings.ask_on_start:
         return settings
@@ -130,7 +191,7 @@ def maybe_confirm_settings(settings: AppSettings) -> AppSettings:
         return settings
 
     # Allow quick source/target changes without full reconfiguration
-    if ask_yes_no("Change source directory?", default=False):
+    if ask_yes_no("\nChange source directory?", default=False):
         settings.source_dir = ask_path(
             "New source directory (memory card):", must_exist=True
         )
@@ -138,6 +199,8 @@ def maybe_confirm_settings(settings: AppSettings) -> AppSettings:
         settings.target_dir = ask_path(
             "New target directory for photos:", must_exist=False
         )
+    if ask_yes_no("Change path template?", default=False):
+        settings.path_template = choose_template()
 
     return settings
 
@@ -151,6 +214,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         argv = sys.argv[1:]
 
     # For now ignore argv and run in interactive mode only.
+    log_path = get_log_file_path()
+    if log_path.exists() and log_path.stat().st_size > 0:
+        if ask_yes_no("Clear previous logs?", default=True):
+            clear_log_file()
+
     configure_logging()
     storage = SettingsStorage()
 

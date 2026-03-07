@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Optional, TYPE_CHECKING
+import logging
 
 if TYPE_CHECKING:
-    from .copier import CopyPlanItem
+    from .copier import CopyPlanItem, CopyStatus
 
 
 class ProgressReporter(ABC):
@@ -42,6 +43,7 @@ class ConsoleProgressReporter(ProgressReporter):
     def start(self, total_items: int) -> None:
         self.total = total_items
         self.done = 0
+        logging.info("Starting copy of %d files.", total_items)
         print(f"Files to copy: {self.total}")
 
     def update(self, done_items: int) -> None:
@@ -54,5 +56,16 @@ class ConsoleProgressReporter(ProgressReporter):
 
     def finish(self) -> None:
         print()
+        logging.info("Copy finished.")
         print("Copy finished.")
+
+    def log_item(self, item: "CopyPlanItem") -> None:
+        from .copier import CopyStatus
+
+        if item.status == CopyStatus.COPIED:
+            logging.info("COPIED: %s -> %s", item.src, item.dst)
+        elif item.status == CopyStatus.SKIPPED:
+            logging.info("SKIPPED: %s (destination exists)", item.src)
+        elif item.status == CopyStatus.ERROR:
+            logging.error("ERROR copying %s: %s", item.src, item.error)
 
