@@ -1,7 +1,7 @@
 [project]
 name = "copymator"
 version = "0.1.0"
-description = "Konsolowe narzędzie do kopiowania zdjęć z kart pamięci z możliwością rozbudowy o GUI."
+description = "A console tool for copying photos from memory cards, with the possibility of expanding to a GUI."
 requires-python = ">=3.10"
 dependencies = [
   "pillow>=10.0.0",
