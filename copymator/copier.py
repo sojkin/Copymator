@@ -3,13 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 import shutil
+import logging
 
 from .config import AppSettings, ConflictStrategy
 from .metadata import MetadataReader, ExifMetadataReader
 from .path_templates import PathTemplate
 from .progress import ProgressReporter
+
+
+# Common image and raw formats
+DEFAULT_SUPPORTED_EXTENSIONS: Set[str] = {
+    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif",
+    ".heic", ".heif", ".webp", ".arw", ".cr2", ".cr3", ".nef",
+    ".orf", ".raf", ".rw2", ".dng",
+}
 
 
 class CopyStatus(str, Enum):
@@ -41,8 +50,11 @@ class CopyPlanner:
     def __init__(
         self,
         metadata_reader: Optional[MetadataReader] = None,
+        supported_extensions: Optional[Set[str]] = None,
     ) -> None:
         self._metadata_reader = metadata_reader or ExifMetadataReader()
+        self._supported_extensions = supported_extensions or DEFAULT_SUPPORTED_EXTENSIONS
+        self._log = logging.getLogger(__name__)
 
     def build_plan(
         self,
@@ -54,11 +66,22 @@ class CopyPlanner:
         for src in source_dir.rglob("*"):
             if not src.is_file():
                 continue
-            metadata = self._metadata_reader.read(src)
+
+            if src.suffix.lower() not in self._supported_extensions:
+                self._log.info("Skipping unsupported file: %s", src)
+                continue
+
+            try:
+                metadata = self._metadata_reader.read(src)
+            except Exception as e:
+                self._log.warning("Could not read metadata for %s: %s", src, e)
+                continue  # Skip files that cause metadata reading errors
+
             rel = template.render(metadata, src)
             dst = target_dir.joinpath(rel, src.name)
             items.append(CopyPlanItem(src=src, dst=dst))
         return items
+
 
 
 class FileCopier:
