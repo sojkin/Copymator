@@ -1,0 +1,33 @@
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Copymator runtime files
+copymator.log
+
+# Cursor / Codex / AI helper metadata (do not push to GitHub)
+.cursor/
+.codex/
+agent-transcripts/
+
