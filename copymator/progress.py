@@ -12,16 +12,13 @@ class ProgressReporter(ABC):
     """Abstract interface for reporting copy progress."""
 
     @abstractmethod
-    def start(self, total_items: int) -> None:
-        ...
+    def start(self, total_items: int) -> None: ...
 
     @abstractmethod
-    def update(self, done_items: int) -> None:
-        ...
+    def update(self, done_items: int) -> None: ...
 
     @abstractmethod
-    def finish(self) -> None:
-        ...
+    def finish(self) -> None: ...
 
     def log_item(self, item: "CopyPlanItem") -> None:  # type: ignore[unused-argument]
         """Optional hook for logging a single item."""
@@ -52,7 +49,7 @@ class ConsoleProgressReporter(ProgressReporter):
             percent = 100
         else:
             percent = int(self.done / self.total * 100)
-        print(f"\rProgress: {self.done}/{self.total} ({percent}%)", end="", flush=True)
+        print(f"\rProgress: {self.done}/{self.total} ({percent}%) ", end="", flush=True)
 
     def finish(self) -> None:
         print()
@@ -68,4 +65,3 @@ class ConsoleProgressReporter(ProgressReporter):
             logging.info("SKIPPED: %s (destination exists)", item.src)
         elif item.status == CopyStatus.ERROR:
             logging.error("ERROR copying %s: %s", item.src, item.error)
-

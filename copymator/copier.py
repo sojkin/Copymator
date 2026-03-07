@@ -51,9 +51,11 @@ class CopyPlanner:
         self,
         metadata_reader: Optional[MetadataReader] = None,
         supported_extensions: Optional[Set[str]] = None,
+        resumed_files: Optional[Set[Path]] = None,
     ) -> None:
         self._metadata_reader = metadata_reader or ExifMetadataReader()
         self._supported_extensions = supported_extensions or DEFAULT_SUPPORTED_EXTENSIONS
+        self._resumed_files = resumed_files or set()
         self._log = logging.getLogger(__name__)
 
     def build_plan(
@@ -65,6 +67,10 @@ class CopyPlanner:
         items: List[CopyPlanItem] = []
         for src in source_dir.rglob("*"):
             if not src.is_file():
+                continue
+
+            if src in self._resumed_files:
+                self._log.info("Skipping already copied file (from log): %s", src)
                 continue
 
             if src.suffix.lower() not in self._supported_extensions:
@@ -144,13 +150,17 @@ class FileCopier:
         return candidate
 
 
-def run_copy(settings: AppSettings, progress: ProgressReporter) -> List[CopyPlanItem]:
+def run_copy(
+    settings: AppSettings,
+    progress: ProgressReporter,
+    resumed_files: Optional[Set[Path]] = None,
+) -> List[CopyPlanItem]:
     """Executes the full copy process based on the given settings.
 
     This function is independent of the CLI and can be reused in a future GUI.
     """
     template = PathTemplate(settings.path_template)
-    planner = CopyPlanner()
+    planner = CopyPlanner(resumed_files=resumed_files)
     items = planner.build_plan(settings.source_dir, settings.target_dir, template)
 
     copier = FileCopier(progress, conflict_strategy=settings.conflict_strategy)

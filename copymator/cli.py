@@ -9,6 +9,7 @@ from .config import AppSettings, SettingsStorage
 from .copier import run_copy
 from .logging_setup import configure_logging, get_log_file_path, clear_log_file
 from .progress import ConsoleProgressReporter
+from .resume import parse_log_for_completed_files
 
 
 DEFAULT_TEMPLATE_DATE = "{year}/{year}-{month}/{year}-{month}-{day}"
@@ -213,13 +214,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
-    # For now ignore argv and run in interactive mode only.
+    resumed_files = None
     log_path = get_log_file_path()
     if log_path.exists() and log_path.stat().st_size > 0:
-        if ask_yes_no("Clear previous logs?", default=True):
+        if ask_yes_no("Previous log file found. Resume last copy?", default=True):
+            # When resuming, we don't clear the log
+            configure_logging()
+            resumed_files = parse_log_for_completed_files()
+        elif ask_yes_no("Clear previous logs?", default=True):
             clear_log_file()
+            configure_logging()
+        else:
+            configure_logging()
+    else:
+        configure_logging()
 
-    configure_logging()
     storage = SettingsStorage()
 
     settings = storage.load()
@@ -229,7 +238,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         settings = maybe_confirm_settings(settings)
 
     progress = ConsoleProgressReporter()
-    run_copy(settings, progress)
+    run_copy(settings, progress, resumed_files=resumed_files)
     return 0
 
 
