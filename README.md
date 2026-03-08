@@ -5,7 +5,7 @@
 
 Copymator is a small cross‑platform CLI tool for copying photos from a memory card
 to a destination directory, organizing them into sub‑folders based on metadata
-(date and optionally camera), and logging what was copied.  
+(date and optionally camera), and logging what was copied.
 The core logic is written so it can be reused from a future GUI.
 
 ---
@@ -75,14 +75,14 @@ If `exiftool` is missing, Copymator will log a warning such as:
 
 Settings are stored per user / per machine in a JSON file:
 
-- **Linux**:  
-  `~/.config/copymator/settings.json`  
-  (or `$XDG_CONFIG_HOME/copymator/settings.json` if `XDG_CONFIG_HOME` is set)
-- **macOS**:  
-  also uses the XDG‑style config directory, for example  
+- **Linux**:
   `~/.config/copymator/settings.json`
-- **Windows**:  
-  `%APPDATA%\Copymator\settings.json`  
+  (or `$XDG_CONFIG_HOME/copymator/settings.json` if `XDG_CONFIG_HOME` is set)
+- **macOS**:
+  also uses the XDG‑style config directory, for example
+  `~/.config/copymator/settings.json`
+- **Windows**:
+  `%APPDATA%\Copymator\settings.json`
   (typically something like `C:\Users\<user>\AppData\Roaming\Copymator\settings.json`)
 
 The same directory also contains the default log file `copymator.log`.
@@ -127,7 +127,7 @@ and shows a menu (messages are currently in Polish):
    - asks only for:
      - destination directory for photos,
      - source directory (memory card),
-   - uses the default date‑based template  
+   - uses the default date‑based template
      `"{year}/{year}-{month}/{year}-{month}-{day}"`,
    - sets conflict strategy to `skip`,
    - disables asking for confirmation on every start.
