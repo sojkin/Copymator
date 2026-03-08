@@ -95,10 +95,10 @@ The same directory also contains the default log file `copymator.log`.
 
 ## Installation and basic usage
 
-From the project root (`/home/marcin/Projekty/Copymator` in your case):
+From the project root (for example `/home/user/Projekty/Copymator`):
 
 ```bash
-cd /home/marcin/Projekty/Copymator
+cd /home/user/Projekty/Copymator
 pip install .
 ```
 
