@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 from .backend import CopyManager
@@ -32,12 +33,53 @@ def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def ask_yes_no(prompt: str, default: bool = True) -> bool:
+def ask_yes_no(prompt: str, default: bool = True, timeout: int | None = None) -> bool:
     """Ask a yes/no question in the console.
 
-    Returns the default value when the user presses Enter.
+    Returns the default value when the user presses Enter or when the optional
+    *timeout* (in seconds) elapses without any input.
     """
     suffix = " [Y/n]: " if default else " [y/N]: "
+
+    if timeout is not None:
+        # Show prompt with countdown hint
+        full_prompt = f"{prompt}{suffix}(auto in {timeout}s) "
+        print(full_prompt, end="", flush=True)
+
+        answer_holder: list[str] = []
+        answered = threading.Event()
+
+        def _read_input() -> None:
+            try:
+                line = sys.stdin.readline()
+                answer_holder.append(line.strip().lower())
+            except Exception:
+                pass
+            finally:
+                answered.set()
+
+        t = threading.Thread(target=_read_input, daemon=True)
+        t.start()
+        answered.wait(timeout=timeout)
+
+        if not answer_holder:
+            # Timeout – use default
+            default_str = "y" if default else "n"
+            print(default_str)
+            return default
+
+        answer = answer_holder[0]
+        if not answer:
+            return default
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"n", "no"}:
+            return False
+        # Invalid answer – fall back to default silently
+        print(f"Invalid answer, using default: {'y' if default else 'n'}")
+        return default
+
+    # No timeout – original blocking behaviour
     while True:
         answer = input(prompt + suffix).strip().lower()
         if not answer:
@@ -189,7 +231,7 @@ def maybe_confirm_settings(settings: AppSettings) -> AppSettings:
     print(f"  Path template: {settings.path_template}")
     print(f"  File conflicts: {settings.conflict_strategy}\n")
 
-    if ask_yes_no("Use these settings without changes?", default=True):
+    if ask_yes_no("Use these settings without changes?", default=True, timeout=5):
         return settings
 
     # Allow quick source/target changes without full reconfiguration
@@ -231,11 +273,11 @@ def main(argv: list[str] | None = None) -> int:
     resumed_files = None
     log_path = get_log_file_path()
     if log_path.exists() and log_path.stat().st_size > 0:
-        if ask_yes_no("Previous log file found. Resume last copy?", default=True):
+        if ask_yes_no("Previous log file found. Resume last copy?", default=True, timeout=5):
             # When resuming, we don't clear the log
             configure_logging()
             resumed_files = parse_log_for_completed_files()
-        elif ask_yes_no("Clear previous logs?", default=True):
+        elif ask_yes_no("Clear previous logs?", default=True, timeout=5):
             clear_log_file()
             configure_logging()
         else:
