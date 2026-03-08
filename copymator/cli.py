@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional
-import sys
 import os
+import sys
+from pathlib import Path
 
+from .backend import CopyManager
 from .config import AppSettings, SettingsStorage
-from .copier import run_copy
-from .logging_setup import configure_logging, get_log_file_path, clear_log_file
+from .logging_setup import (
+    clear_log_file,
+    configure_logging,
+    get_log_file_path,
+    log_session_end,
+    log_session_start,
+)
 from .progress import ConsoleProgressReporter
-from .resume import parse_log_for_completed_files
-
+from .resume import log_overall_summary, parse_log_for_completed_files
 
 DEFAULT_TEMPLATE_DATE = "{year}/{year}-{month}/{year}-{month}-{day}"
 DEFAULT_TEMPLATE_CAMERA = "{camera}/{year}-{month}-{day}"
@@ -25,7 +29,7 @@ TEMPLATE_PARTS = {
 
 def clear_screen():
     """Clears the console screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def ask_yes_no(prompt: str, default: bool = True) -> bool:
@@ -71,20 +75,22 @@ def build_template_interactively() -> str:
 
         current_template = "".join(template_parts)
         print(f"Current template: {current_template}\n")
-        choice = input("Choose a part, 's' (separator), 'f' (finish), 'c' (cancel): ").strip().lower()
+        choice = (
+            input("Choose a part, 's' (separator), 'f' (finish), 'c' (cancel): ").strip().lower()
+        )
 
         if choice in TEMPLATE_PARTS:
             template_parts.append(TEMPLATE_PARTS[choice]["value"])
-        elif choice == 's':
+        elif choice == "s":
             separator = input("Enter separator: ")
             template_parts.append(separator)
-        elif choice == 'f':
+        elif choice == "f":
             if not current_template:
                 print("Template cannot be empty. Press Enter to continue...")
                 input()
                 continue
             return current_template
-        elif choice == 'c':
+        elif choice == "c":
             return ""  # Return empty to indicate cancellation
         else:
             print("Invalid option. Press Enter to try again...")
@@ -124,7 +130,7 @@ def first_run_config(storage: SettingsStorage) -> AppSettings:
     print("1) Quick copy with default settings")
     print("2) Detailed configuration")
 
-    mode: Optional[str] = None
+    mode: str | None = None
     while mode not in {"1", "2"}:
         mode = input("Choice (1/2): ").strip()
         if mode not in {"1", "2"}:
@@ -161,9 +167,7 @@ def first_run_config(storage: SettingsStorage) -> AppSettings:
     conflict_map = {"1": "skip", "2": "overwrite", "3": "rename"}
     conflict_strategy = conflict_map[conflict_choice]
 
-    ask_on_start = ask_yes_no(
-        "\nAsk for confirmation on every run?", default=True
-    )
+    ask_on_start = ask_yes_no("\nAsk for confirmation on every run?", default=True)
 
     settings = AppSettings(
         source_dir=source_dir,
@@ -185,28 +189,38 @@ def maybe_confirm_settings(settings: AppSettings) -> AppSettings:
     print(f"  Path template: {settings.path_template}")
     print(f"  File conflicts: {settings.conflict_strategy}\n")
 
-    if not settings.ask_on_start:
-        return settings
-
     if ask_yes_no("Use these settings without changes?", default=True):
         return settings
 
     # Allow quick source/target changes without full reconfiguration
     if ask_yes_no("\nChange source directory?", default=False):
-        settings.source_dir = ask_path(
-            "New source directory (memory card):", must_exist=True
-        )
+        settings.source_dir = ask_path("New source directory (memory card):", must_exist=True)
     if ask_yes_no("Change target directory?", default=False):
-        settings.target_dir = ask_path(
-            "New target directory for photos:", must_exist=False
-        )
+        settings.target_dir = ask_path("New target directory for photos:", must_exist=False)
     if ask_yes_no("Change path template?", default=False):
         settings.path_template = choose_template()
+    if ask_yes_no("Change conflict strategy?", default=False):
+        print("\nFile name conflict behavior:")
+        print("1) skip existing file")
+        print("2) overwrite existing file")
+        print("3) save with a new name (add a number)")
+        conflict_choice = None
+        while conflict_choice not in {"1", "2", "3"}:
+            conflict_choice = input("Choice (1/2/3): ").strip()
+            if conflict_choice not in {"1", "2", "3"}:
+                print("Invalid option, choose 1, 2, or 3.")
+        conflict_map = {"1": "skip", "2": "overwrite", "3": "rename"}
+        settings.conflict_strategy = conflict_map[conflict_choice]  # type: ignore[assignment]
+
+    # Save updated settings
+    storage = SettingsStorage()
+    storage.save(settings)
+    return settings
 
     return settings
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
 
     Loads or creates settings and then runs the copy process.
@@ -229,6 +243,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     else:
         configure_logging()
 
+    log_session_start()
+
     storage = SettingsStorage()
 
     settings = storage.load()
@@ -238,10 +254,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         settings = maybe_confirm_settings(settings)
 
     progress = ConsoleProgressReporter()
-    run_copy(settings, progress, resumed_files=resumed_files)
+    manager = CopyManager(progress)
+    try:
+        manager.execute_copy(settings, resumed_files=resumed_files)
+        log_session_end()
+        log_overall_summary()
+    except Exception:
+        # Re-raise the exception after logging
+        raise
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

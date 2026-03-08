@@ -23,6 +23,5 @@ class PathTemplate:
         except KeyError as exc:
             # If the template references a missing key, fall back to an "unknown" folder
             missing = str(exc)
-            relative = f"unknown_missing_{missing.strip('\"')}"
+            relative = f"unknown_missing_{missing.strip('"')}"
         return Path(relative)
-

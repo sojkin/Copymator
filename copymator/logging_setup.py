@@ -38,3 +38,12 @@ def configure_logging() -> None:
         ],
     )
 
+
+def log_session_start() -> None:
+    """Log the start of a copy session."""
+    logging.info("SESSION_START")
+
+
+def log_session_end() -> None:
+    """Log the end of a copy session."""
+    logging.info("SESSION_END")

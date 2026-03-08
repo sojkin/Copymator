@@ -1,23 +1,44 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import logging
+import shutil
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Set
-import shutil
-import logging
 
 from .config import AppSettings, ConflictStrategy
-from .metadata import MetadataReader, ExifMetadataReader
+from .metadata import ExifMetadataReader, MetadataReader
 from .path_templates import PathTemplate
 from .progress import ProgressReporter
 
-
-# Common image and raw formats
-DEFAULT_SUPPORTED_EXTENSIONS: Set[str] = {
-    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif",
-    ".heic", ".heif", ".webp", ".arw", ".cr2", ".cr3", ".nef",
-    ".orf", ".raf", ".rw2", ".dng",
+# Supported extensions, grouped by category
+DEFAULT_SUPPORTED_EXTENSIONS: set[str] = {
+    # Raster / jpg-like files
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".tiff",
+    ".tif",
+    ".heic",
+    ".heif",
+    ".webp",
+    # Raw formats from cameras
+    ".arw",
+    ".cr2",
+    ".cr3",
+    ".nef",
+    ".orf",
+    ".raf",
+    ".rw2",
+    ".dng",
+    # Video files with metadata/Exif (mp4 and related)
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mkv",
+    ".wmv",
 }
 
 
@@ -37,7 +58,7 @@ class CopyPlanItem:
     src: Path
     dst: Path
     status: CopyStatus = CopyStatus.PENDING
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class CopyPlanner:
@@ -49,9 +70,9 @@ class CopyPlanner:
 
     def __init__(
         self,
-        metadata_reader: Optional[MetadataReader] = None,
-        supported_extensions: Optional[Set[str]] = None,
-        resumed_files: Optional[Set[Path]] = None,
+        metadata_reader: MetadataReader | None = None,
+        supported_extensions: set[str] | None = None,
+        resumed_files: set[Path] | None = None,
     ) -> None:
         self._metadata_reader = metadata_reader or ExifMetadataReader()
         self._supported_extensions = supported_extensions or DEFAULT_SUPPORTED_EXTENSIONS
@@ -63,8 +84,8 @@ class CopyPlanner:
         source_dir: Path,
         target_dir: Path,
         template: PathTemplate,
-    ) -> List[CopyPlanItem]:
-        items: List[CopyPlanItem] = []
+    ) -> list[CopyPlanItem]:
+        items: list[CopyPlanItem] = []
         for src in source_dir.rglob("*"):
             if not src.is_file():
                 continue
@@ -89,7 +110,6 @@ class CopyPlanner:
         return items
 
 
-
 class FileCopier:
     """Executes the copy plan and updates progress and item statuses."""
 
@@ -101,7 +121,7 @@ class FileCopier:
         self.progress = progress
         self.conflict_strategy: ConflictStrategy = conflict_strategy
 
-    def copy_all(self, items: List[CopyPlanItem]) -> None:
+    def copy_all(self, items: list[CopyPlanItem]) -> None:
         """Copy all files from the plan, updating their status and reporting progress."""
         total = len(items)
         self.progress.start(total)
@@ -128,7 +148,7 @@ class FileCopier:
                 else:
                     shutil.copy2(item.src, item.dst)
                     item.status = CopyStatus.COPIED
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 item.status = CopyStatus.ERROR
                 item.error = str(exc)
 
@@ -153,8 +173,8 @@ class FileCopier:
 def run_copy(
     settings: AppSettings,
     progress: ProgressReporter,
-    resumed_files: Optional[Set[Path]] = None,
-) -> List[CopyPlanItem]:
+    resumed_files: set[Path] | None = None,
+) -> list[CopyPlanItem]:
     """Executes the full copy process based on the given settings.
 
     This function is independent of the CLI and can be reused in a future GUI.
@@ -166,4 +186,3 @@ def run_copy(
     copier = FileCopier(progress, conflict_strategy=settings.conflict_strategy)
     copier.copy_all(items)
     return items
-

@@ -23,8 +23,15 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Copymator runtime files
+# Copymator runtime and configuration files
 copymator.log
+.config/copymator/
+settings.json
+
+# Environment variables
+.env
+.env.local
+*.local
 
 # Cursor / Codex / AI helper metadata (do not push to GitHub)
 .cursor/

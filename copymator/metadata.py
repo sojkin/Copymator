@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+import json
+import logging
+import platform
+import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Protocol
-import json
-import shutil
-import subprocess
-import logging
-import platform
+from typing import Protocol
 
 try:
-    from PIL import Image, ExifTags
-except Exception:  # noqa: BLE001
+    from PIL import ExifTags, Image
+except Exception:
     Image = None  # type: ignore[assignment]
     ExifTags = None  # type: ignore[assignment]
 
@@ -21,11 +21,11 @@ except Exception:  # noqa: BLE001
 class PhotoMetadata:
     """Basic photo metadata required to build output paths."""
 
-    taken_at: Optional[datetime]
-    camera_make: Optional[str] = None
-    camera_model: Optional[str] = None
+    taken_at: datetime | None
+    camera_make: str | None = None
+    camera_model: str | None = None
 
-    def to_template_dict(self, src_path: Path) -> Dict[str, str]:
+    def to_template_dict(self, src_path: Path) -> dict[str, str]:
         """Build a dictionary of fields that can be used in a path template."""
         dt = self.taken_at
         if dt is None:
@@ -52,8 +52,7 @@ class MetadataReader(Protocol):
     protocol allows swapping in richer implementations (e.g. Pillow-based).
     """
 
-    def read(self, path: Path) -> PhotoMetadata:
-        ...
+    def read(self, path: Path) -> PhotoMetadata: ...
 
 
 class StatOnlyMetadataReader:
@@ -85,11 +84,9 @@ class ExifMetadataReader:
                 hint = "Download exiftool for Windows from the author and add it to PATH."
             else:
                 hint = "Install exiftool for your system and add it to PATH."
-            logging.warning(
-                "No exiftool found in PATH – RAW dates may be incorrect. %s", hint
-            )
+            logging.warning("No exiftool found in PATH – RAW dates may be incorrect. %s", hint)
 
-    def _read_with_exiftool(self, path: Path) -> Optional[PhotoMetadata]:
+    def _read_with_exiftool(self, path: Path) -> PhotoMetadata | None:
         """Try to read metadata via the external ``exiftool`` binary.
 
         exiftool has excellent support for RAW formats (e.g. CR3), which Pillow
@@ -111,7 +108,7 @@ class ExifMetadataReader:
                 ],
                 text=True,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
         try:
@@ -119,15 +116,15 @@ class ExifMetadataReader:
             if not data_list:
                 return None
             data = data_list[0]
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
         date_str = data.get("DateTimeOriginal") or data.get("DateTime")
-        taken_at: Optional[datetime] = None
+        taken_at: datetime | None = None
         if isinstance(date_str, str):
             try:
                 taken_at = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 taken_at = None
 
         meta = self._fallback.read(path)
@@ -156,22 +153,22 @@ class ExifMetadataReader:
         try:
             with Image.open(path) as img:  # type: ignore[call-arg]
                 exif_raw = img._getexif() or {}
-        except Exception:  # noqa: BLE001
+        except Exception:
             return self._fallback.read(path)
 
         # Convert numeric EXIF tag IDs to readable names
-        tags: Dict[str, str] = {}
+        tags: dict[str, str] = {}
         for tag_id, value in exif_raw.items():
             name = ExifTags.TAGS.get(tag_id, str(tag_id))  # type: ignore[index]
             tags[name] = value
 
-        taken_at: Optional[datetime] = None
+        taken_at: datetime | None = None
         date_str = tags.get("DateTimeOriginal") or tags.get("DateTime")
         if isinstance(date_str, str):
             # EXIF timestamp format: "YYYY:MM:DD HH:MM:SS"
             try:
                 taken_at = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 taken_at = None
 
         meta = self._fallback.read(path)
@@ -186,5 +183,3 @@ class ExifMetadataReader:
             meta.camera_model = model.strip()
 
         return meta
-
-

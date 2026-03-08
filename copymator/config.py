@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
 import json
 import os
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal, Any, Dict
-
+from typing import Any, Literal
 
 ConflictStrategy = Literal["skip", "overwrite", "rename"]
 
@@ -26,7 +25,7 @@ class AppSettings:
     separate_log_file: bool = True
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AppSettings":
+    def from_dict(cls, data: dict[str, Any]) -> AppSettings:
         return cls(
             source_dir=Path(data["source_dir"]),
             target_dir=Path(data["target_dir"]),
@@ -36,7 +35,7 @@ class AppSettings:
             separate_log_file=bool(data.get("separate_log_file", True)),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["source_dir"] = str(self.source_dir)
         data["target_dir"] = str(self.target_dir)
@@ -83,5 +82,3 @@ class SettingsStorage:
         data = settings.to_dict()
         with self.settings_path.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-
-

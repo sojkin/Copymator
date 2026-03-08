@@ -1,5 +1,8 @@
 # Copymator
 
+**Version:** 0.1.0
+
+
 Copymator is a small cross‑platform CLI tool for copying photos from a memory card
 to a destination directory, organizing them into sub‑folders based on metadata
 (date and optionally camera), and logging what was copied.  
@@ -18,7 +21,10 @@ The core logic is written so it can be reused from a future GUI.
   - `"{camera}/{year}-{month}-{day}"`.
 - **Copy strategies for existing files**: skip / overwrite / rename with numeric suffix.
 - **Progress reporting** in the terminal.
-- **Logging** to a file plus console output.
+- **Logging** to a file plus console output, including a session summary (copied/skipped/errors per type).
+- **Resume support**: the tool can continue an interrupted run by parsing the existing log, skipping already processed files.
+- **Overall summary** across multiple sessions, with per-session breakdown and unsupported-file statistics.
+- **Unsupported file reporting**: every skipped file due to unsupported extension is logged and counted.
 - **Ready for GUI integration** via the `run_copy()` function and `ProgressReporter` interface.
 
 ---
