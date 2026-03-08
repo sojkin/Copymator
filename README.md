@@ -25,7 +25,11 @@ The core logic is written so it can be reused from a future GUI.
 - **Resume support**: the tool can continue an interrupted run by parsing the existing log, skipping already processed files.
 - **Overall summary** across multiple sessions, with per-session breakdown and unsupported-file statistics.
 - **Unsupported file reporting**: every skipped file due to unsupported extension is logged and counted.
-- **Ready for GUI integration** via the `run_copy()` function and `ProgressReporter` interface.
+- **Ready for GUI integration** via the `run_copy()` function, `ProgressReporter` interface and an optional `GUICopyInterface` helper class.
+- **Custom path template builder** for interactively creating your own directory layout from `year`, `month`, `day` and `camera` parts and separators.
+- **Configurable on every run**: when `ask_on_start` is enabled you can quickly adjust not only source/target folders, but also the path template and conflict behaviour.
+- **Photo and video support** out of the box (JPEG/PNG/HEIC and RAW formats such as CR3, plus video files like MP4/MOV/MKV/WMV; see `DEFAULT_SUPPORTED_EXTENSIONS` in `copymator/copier.py` for the exact list).
+- **Log management from the CLI**: when a previous log exists you can choose to resume the last copy, clear the log, or continue without resuming.
 
 ---
 
@@ -138,6 +142,7 @@ and shows a menu (messages are currently in Polish):
      - target directory,
      - one of the predefined templates
        (`{year}/{year}-{month}/{year}-{month}-{day}` or `{camera}/{year}-{month}-{day}`),
+     - or lets you build a custom template interactively from `year`, `month`, `day` and `camera` pieces,
      - conflict behaviour: skip / overwrite / rename,
      - whether to confirm settings on each run.
 
@@ -160,6 +165,8 @@ On later runs Copymator:
    - optionally lets you quickly change:
      - source directory,
      - target directory,
+     - path template,
+     - conflict behaviour (skip / overwrite / rename),
    - then runs the copy.
 
 The directory structure is generated from the configured template and metadata
@@ -207,6 +214,18 @@ When a target file already exists, the configured conflict strategy is used:
 
 ---
 
+## Supported file types
+
+By default Copymator treats the following extensions as supported and eligible for copying:
+
+- **Raster images**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.tif`, `.heic`, `.heif`, `.webp`.
+- **RAW camera formats**: `.arw`, `.cr2`, `.cr3`, `.nef`, `.orf`, `.raf`, `.rw2`, `.dng`.
+- **Video files**: `.mp4`, `.mov`, `.avi`, `.mkv`, `.wmv`.
+
+Files with other extensions are skipped and only counted in the "unsupported file" statistics mentioned above.
+
+---
+
 ## Using Copymator from other code (e.g. GUI)
 
 The public API intended for reuse is:
@@ -214,6 +233,7 @@ The public API intended for reuse is:
 - `copymator.config.AppSettings` – holds configuration for a single run.
 - `copymator.progress.ProgressReporter` – interface for progress reporting.
 - `copymator.copier.run_copy(settings: AppSettings, progress: ProgressReporter)` – performs the copy and returns a list of `CopyPlanItem` objects with final status.
+- `copymator.gui.GUICopyInterface` – small helper that wires together `CopyManager` and a `ProgressReporter` for GUI front-ends.
 
 Example skeleton for a future GUI:
 
@@ -255,4 +275,12 @@ invoked automatically from the CLI entry point.
 - Log file: `copymator.log` in the same directory as `settings.json`.
 - Default level: `INFO`.
 - Format: timestamp, level, message.
+
+When a previous log file already exists, the CLI will:
+
+- offer to resume the last copy using that log,
+- optionally clear the existing log before starting a fresh run,
+- or continue without resuming or clearing.
+
+At the end of each run Copymator also logs an overall summary across all sessions, including statistics for copied, skipped, error and unsupported file types.
 
